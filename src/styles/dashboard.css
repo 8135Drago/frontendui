@@ -1,0 +1,125 @@
+.dashboard {
+  background-color: #121212;
+  color: #fff;
+  padding: 20px;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.section h3 {
+  color: #ff3b3b;
+  margin-bottom: 10px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.filters input, .filters select {
+  background-color: #1e1e1e;
+  color: white;
+  border: 1px solid #333;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.job-cards-container {
+  display: flex;
+  overflow-x: auto;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.job-card {
+  flex: 0 0 220px;
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.job-card:hover {
+  transform: scale(1.03);
+  border-color: #ff3b3b;
+}
+
+.progress-bar {
+  height: 6px;
+  border-radius: 4px;
+  background-color: #333;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #ff3b3b;
+  width: 0%;
+  animation: progressGrow linear forwards;
+}
+
+@keyframes progressGrow {
+  from { width: 0%; }
+  to { width: var(--progress, 100%); }
+}
+
+.action-feed {
+  max-height: 350px;
+  overflow-y: auto;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+}
+
+.modal-content {
+  background: #111;
+  color: white;
+  padding: 20px 30px;
+  border-radius: 10px;
+  width: 400px;
+  max-width: 95%;
+  box-shadow: 0 0 20px #ff3b3b;
+  position: relative;
+  animation: fadeIn 0.3s ease;
+}
+
+.close-btn {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  font-size: 1.5em;
+  background: none;
+  border: none;
+  color: #ff3b3b;
+  cursor: pointer;
+}
+
+.job-details p {
+  margin: 5px 0;
+  border-bottom: 1px solid #222;
+  padding-bottom: 3px;
+}
+
+@keyframes fadeIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

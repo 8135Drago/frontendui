@@ -1,0 +1,271 @@
+import React, { useEffect, useMemo, useState } from "react";
+
+// Format large numbers (fallback if parent doesn't provide formatter)
+const formatLargeNumber = (num) => {
+  if (typeof num !== "number" || Number.isNaN(num)) return num;
+  if (num >= 1e6) return (num / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+  if (num >= 1e3) return (num / 1e3).toFixed(1).replace(/\.0$/, "") + "k";
+  return String(num);
+};
+
+const StatisticsChart = ({ statistics = {}, formatNumber }) => {
+  // Use parent's formatter if provided; otherwise fallback to local formatter
+  const format = (n) => (typeof formatNumber === "function" ? formatNumber(n) : formatLargeNumber(n));
+
+  // Defensive numeric coercion
+  const completed = Number(statistics.completed) || 0;
+  const running = Number(statistics.running) || 0;
+  const queue = Number(statistics.queue) || 0;
+  const failed = Number(statistics.failed) || 0;
+  const cancelled = Number(statistics.cancelled) || 0;
+
+  // If statistics.total is missing or zero, fall back to sum of parts.
+  const derivedTotal = Number(statistics.total);
+  const sumParts = completed + running + queue + failed + cancelled;
+  const total = Number.isFinite(derivedTotal) && derivedTotal > 0 ? derivedTotal : sumParts;
+
+  const statusData = useMemo(
+    () => [
+      { label: "Completed", value: completed, color: "#10b981" },
+      { label: "Running", value: running, color: "#3b82f6" },
+      { label: "Queue", value: queue, color: "#f59e0b" },
+      { label: "Failed", value: failed, color: "#ef4444" },
+      { label: "Cancelled", value: cancelled, color: "#6b7280" },
+    ],
+    [completed, running, queue, failed, cancelled]
+  );
+
+  // compute percentages (safe)
+  const statusWithPerc = useMemo(
+    () =>
+      statusData.map((it) => ({
+        ...it,
+        percentage: total > 0 ? (it.value / total) * 100 : 0,
+      })),
+    [statusData, total]
+  );
+
+  // safe responsive check (guard for SSR)
+  const [isLarge, setIsLarge] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth > 1024 : false
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1025px)");
+    const handler = (e) => setIsLarge(e.matches);
+    setIsLarge(mq.matches);
+    if (mq.addEventListener) {
+      mq.addEventListener("change", handler);
+    } else {
+      // fallback
+      mq.addListener(handler);
+    }
+    return () => {
+      if (mq.removeEventListener) {
+        mq.removeEventListener("change", handler);
+      } else {
+        mq.removeListener(handler);
+      }
+    };
+  }, []);
+
+  // Add hover state for tooltips
+  const [hovered, setHovered] = useState(null);
+
+  // simple hover style object (applied via inline style on events)
+  const baseContainerStyle = {
+    background: "#1a1a1a",
+    borderRadius: 12,
+    padding: 24,
+    border: "1px solid #2a2a2a",
+    transition: "all 0.2s ease",
+    marginBottom: "3%",
+  };
+
+  const titleStyle = { fontSize: 20, fontWeight: 700, color: "white", margin: 0 };
+  const subText = { fontSize: 14, color: "#9ca3af" };
+
+  const barOuter = {
+    background: "#2a2a2a",
+    borderRadius: 9999,
+    height: 12,
+    overflow: "hidden",
+  };
+
+  const legendGrid = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+  };
+
+  // Debug log so you can inspect the incoming prop quickly
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    // console.debug("StatisticsChart props:", { statistics, total, statusWithPerc });
+  }, [statistics, total, statusWithPerc]);
+
+  // Build donut slices (angles)
+  const slices = useMemo(() => {
+    let currentAngle = 0;
+    return statusWithPerc
+      .map((item) => {
+        const angle = (item.percentage / 100) * 360;
+        if (angle <= 0) return null; // skip zero slices
+        const startAngle = currentAngle;
+        currentAngle += angle;
+        const startX = 50 + 40 * Math.cos((startAngle * Math.PI) / 180);
+        const startY = 50 + 40 * Math.sin((startAngle * Math.PI) / 180);
+        const endX = 50 + 40 * Math.cos((currentAngle * Math.PI) / 180);
+        const endY = 50 + 40 * Math.sin((currentAngle * Math.PI) / 180);
+        const largeArc = angle > 180 ? 1 : 0;
+        const d = `M 50 50 L ${startX} ${startY} A 40 40 0 ${largeArc} 1 ${endX} ${endY} Z`;
+        return { d, color: item.color, label: item.label, value: item.value };
+      })
+      .filter(Boolean);
+  }, [statusWithPerc]);
+
+  // compute display total - prefer provided statistics.total if present
+  const displayTotalValue = total;
+  const displayTotal = format(displayTotalValue);
+
+  // --- Layout fixes ---
+  // Make chart fill available width, center donut, and keep legend in a single row
+  return (
+    <div
+      style={{ ...baseContainerStyle, width: "100%", maxWidth: "100%" }}
+      onMouseEnter={(e) => (e.currentTarget.style.border = "1px solid #3a3a3a")}
+      onMouseLeave={(e) => (e.currentTarget.style.border = "1px solid #2a2a2a")}
+      role="region"
+      aria-label="Job statistics overview"
+    >
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <h2 style={titleStyle}>Job Statistics Overview</h2>
+        <div style={subText}>
+          Showing{" "}
+          <span style={{ color: "white", fontWeight: 600 }}>{displayTotal}</span>{" "}
+          jobs
+        </div>
+      </div>
+      {/* Layout */}
+      <div style={{ display: "flex", flexDirection: isLarge ? "row" : "column", gap: 24, width: "100%" }}>
+        {/* Bar Section */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: 1 }}>
+          {statusWithPerc.map((item) => (
+            <div
+              key={item.label}
+              style={{ display: "flex", flexDirection: "column", gap: 6, position: "relative" }}
+              onMouseEnter={() => setHovered(item.label)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 14, color: "#9ca3af" }}>{item.label}</span>
+                <span style={{ fontSize: 14, color: "white", fontWeight: 600 }}>{format(item.value)}</span>
+              </div>
+              <div style={barOuter} aria-hidden>
+                <div
+                  style={{
+                    width: `${Math.max(0, Math.min(100, item.percentage))}%`,
+                    backgroundColor: item.color,
+                    height: "100%",
+                    borderRadius: "inherit",
+                    transition: "width 800ms cubic-bezier(.2,.8,.2,1)",
+                  }}
+                />
+                {hovered === item.label && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: -32,
+                      background: "#222",
+                      color: "#fff",
+                      padding: "4px 10px",
+                      borderRadius: 6,
+                      fontSize: 13,
+                      pointerEvents: "none",
+                      zIndex: 10,
+                    }}
+                  >
+                    {`${item.label} Jobs: ${format(item.value)}`}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Donut Section */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 320 }}>
+          <div style={{ position: "relative", width: 250, height: 250, margin: "0 auto" }}>
+            <svg viewBox="0 0 100 100" style={{ transform: "rotate(-90deg)", width: "100%", height: "100%" }} role="img" aria-label="Job distribution donut">
+              {slices.map((s, i) => (
+                <path
+                  key={i}
+                  d={s.d}
+                  fill={s.color}
+                  style={{ transition: "opacity 120ms ease", cursor: "pointer" }}
+                  onMouseEnter={() => setHovered(s.label)}
+                  onMouseLeave={() => setHovered(null)}
+                />
+              ))}
+              <circle cx="50" cy="50" r="25" fill="#0a0a0a" />
+            </svg>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <span style={{ fontSize: 28, fontWeight: 700, color: "white" }}>{displayTotal}</span>
+              <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Jobs</span>
+            </div>
+            {hovered && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  top: 0,
+                  transform: "translateX(-50%)",
+                  background: "#222",
+                  color: "#fff",
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  pointerEvents: "none",
+                  zIndex: 10,
+                }}
+              >
+                {hovered === "Completed" && `Success Jobs: ${format(completed)}`}
+                {hovered === "Running" && `In Progress Jobs: ${format(running)}`}
+                {hovered === "Queue" && `In Queue Jobs: ${format(queue)}`}
+                {hovered === "Failed" && `Failed Jobs: ${format(failed)}`}
+                {hovered === "Cancelled" && `Cancelled Jobs: ${format(cancelled)}`}
+              </div>
+            )}
+          </div>
+          {/* Legend - single row, no wrap */}
+          <div style={{ ...legendGrid, flexWrap: "nowrap", justifyContent: "center", width: "100%", overflowX: "auto" }}>
+            {statusWithPerc.map((item) => (
+              <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: item.color }} />
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                  {item.label} — <strong style={{ color: "white" }}>{format(item.value)}</strong>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default StatisticsChart;
