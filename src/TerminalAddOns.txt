@@ -1,0 +1,75 @@
+const execute = async () => {
+  if (!command.trim() || !server) return;
+
+  const base = command.trim().split(" ")[0].toLowerCase();
+
+  if (!isAdmin && !allowedCommands.includes(base)) {
+    setOutput(prev => [...prev, `Command not allowed due to insufficient privileges`]);
+    setCommand("");
+    return;
+  }
+
+  setOutput(prev => [...prev, `> ${command}`]);
+  setHistory(prev => [...prev.slice(-9), command]);
+  historyIndex.current = -1;
+  setCommand("");
+  setLoading(true);
+
+  const res = await fetch(`https://${server.ip}:${server.port}/api/v1/executecustom`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "userid": authHeaders.userid
+    },
+    body: JSON.stringify({
+      jobid: command,
+      processid: null,
+      force: null,
+      step: ""
+    })
+  });
+
+  const data = await res.json();
+  setOutput(prev => [...prev, data.log || ""]);
+  setLoading(false);
+};
+
+
+
+
+
+---------------
+
+
+
+
+
+const [allowedCommands, setAllowedCommands] = useState([]);
+const [isAdmin, setIsAdmin] = useState(false);
+
+
+
+--------------
+
+
+useEffect(() => {
+  fetch("/api/user/permissions", { headers: authHeaders })
+    .then(res => res.json())
+    .then(data => {
+      if (data.role && data.role.includes("ADMIN")) {
+        setIsAdmin(true);
+      } else {
+        setAllowedCommands(
+          data.validcommands ? data.validcommands.split(",").map(x => x.trim().toLowerCase()) : []
+        );
+      }
+    });
+}, []);
+
+
+
+
+-------------
+
+
